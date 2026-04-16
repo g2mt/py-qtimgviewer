@@ -497,6 +497,10 @@ class ImageViewer(QLabel):
         if not self.current_pixmap or self.current_pixmap.isNull():
             return
 
+        if not (event.modifiers() & Qt.ControlModifier):
+            super().wheelEvent(event)
+            return
+
         zoom_in_factor = 1.25
         zoom_out_factor = 1 / zoom_in_factor
 
