@@ -474,7 +474,7 @@ class ThumbnailListWidget(QListView):
 
 
 class ImageViewer(QLabel):
-    """Widget for displaying the selected image."""
+    """Widget for displaying the selected image with mouse-centered zoom."""
     
     navigate = Signal(int)
     
@@ -483,11 +483,49 @@ class ImageViewer(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setText("Select an image from the sidebar")
         self.setStyleSheet("QLabel { background-color: #2b2b2b; color: #888; font-size: 14px; }")
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.setMinimumSize(400, 300)
         self.setFocusPolicy(Qt.StrongFocus)
         self.current_pixmap: Optional[QPixmap] = None
-    
+        self.scale_factor = 1.0
+        self.scroll_area: Optional[QScrollArea] = None
+
+    def set_scroll_area(self, scroll_area: QScrollArea):
+        self.scroll_area = scroll_area
+
+    def wheelEvent(self, event):
+        if not self.current_pixmap or self.current_pixmap.isNull():
+            return
+
+        zoom_in_factor = 1.25
+        zoom_out_factor = 1 / zoom_in_factor
+
+        old_pos = event.position()
+        old_scale = self.scale_factor
+
+        if event.angleDelta().y() > 0:
+            self.scale_factor *= zoom_in_factor
+        else:
+            self.scale_factor *= zoom_out_factor
+
+        # Limit scale
+        self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
+        
+        self._update_display()
+
+        if self.scroll_area:
+            # Calculate the adjustment needed to keep the mouse position fixed relative to the image
+            ratio = self.scale_factor / old_scale
+            
+            h_bar = self.scroll_area.horizontalScrollBar()
+            v_bar = self.scroll_area.verticalScrollBar()
+
+            delta_x = (old_pos.x() + h_bar.value()) * ratio - old_pos.x()
+            delta_y = (old_pos.y() + v_bar.value()) * ratio - old_pos.y()
+
+            h_bar.setValue(int(delta_x))
+            v_bar.setValue(int(delta_y))
+
     def keyPressEvent(self, event):
         direction = {
             Qt.Key_Left: -1,
@@ -504,6 +542,13 @@ class ImageViewer(QLabel):
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
             self.current_pixmap = pixmap
+            # Reset zoom when loading new image
+            self.scale_factor = 1.0
+            if self.scroll_area:
+                # Fit to viewport initially
+                view_size = self.scroll_area.viewport().size()
+                self.scale_factor = min(view_size.width() / pixmap.width(), 
+                                       view_size.height() / pixmap.height(), 1.0)
             self._update_display()
             self.setToolTip(f"{image_path}\n{pixmap.width()}x{pixmap.height()}")
         else:
@@ -511,14 +556,10 @@ class ImageViewer(QLabel):
             self.current_pixmap = None
     
     def _update_display(self):
-        if self.current_pixmap:
-            scaled_pixmap = self.current_pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.setPixmap(scaled_pixmap)
-    
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if self.current_pixmap:
-            self._update_display()
+        if self.current_pixmap and not self.current_pixmap.isNull():
+            new_size = self.current_pixmap.size() * self.scale_factor
+            self.setPixmap(self.current_pixmap.scaled(new_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.resize(new_size)
     
     def mouseDoubleClickEvent(self, event):
         if self.current_pixmap and (tooltip := self.toolTip()):
@@ -661,13 +702,15 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.thumbnail_list)
         
         # Image viewer
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setAlignment(Qt.AlignCenter)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setAlignment(Qt.AlignCenter)
+        self.scroll_area.setStyleSheet("QScrollArea { background-color: #2b2b2b; border: none; }")
         
         self.image_viewer = ImageViewer()
+        self.image_viewer.set_scroll_area(self.scroll_area)
         self.image_viewer.navigate.connect(self._navigate_image)
-        scroll_area.setWidget(self.image_viewer)
+        self.scroll_area.setWidget(self.image_viewer)
 
         # Connect widgets to image filter
         self.filter_input.textChanged.connect(self.image_filter.set_filter_text)
@@ -677,8 +720,8 @@ class MainWindow(QMainWindow):
         # Add widgets to splitter
         self.splitter.addWidget(self.sidebar)
         self.sidebar.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-        self.splitter.addWidget(scroll_area)
-        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.splitter.addWidget(self.scroll_area)
+        self.scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setCollapsible(0, False)
