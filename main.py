@@ -501,7 +501,7 @@ class ImageViewer(QLabel):
             super().wheelEvent(event)
             return
 
-        zoom_in_factor = 1.25
+        zoom_in_factor = 1.1
         zoom_out_factor = 1 / zoom_in_factor
 
         old_scale = self.scale_factor
@@ -526,13 +526,6 @@ class ImageViewer(QLabel):
 
             self._update_display()
 
-            # Calculate new scroll positions to keep mouse over same image point
-            ratio = self.scale_factor / old_scale
-            new_h = content_x * ratio - mouse_pos.x()
-            new_v = content_y * ratio - mouse_pos.y()
-
-            h_bar.setValue(int(new_h))
-            v_bar.setValue(int(new_v))
         else:
             self._update_display()
 
