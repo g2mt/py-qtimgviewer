@@ -560,7 +560,6 @@ class ImageViewer(QLabel):
                 self.scale_factor = min(view_size.width() / pixmap.width(), 
                                        view_size.height() / pixmap.height(), 1.0)
             self._update_display()
-            self.setToolTip(f"{image_path}\n{pixmap.width()}x{pixmap.height()}")
         else:
             self.setText(f"Failed to load image:\n{image_path}")
             self.current_pixmap = None
@@ -575,9 +574,12 @@ class ImageViewer(QLabel):
             self.resize(self.scroll_area.viewport().size())
     
     def mouseDoubleClickEvent(self, event):
-        if self.current_pixmap and (tooltip := self.toolTip()):
-            image_path = tooltip.split('\n')[0]
-            if os.path.isfile(image_path):
+        if self.current_pixmap:
+            # Get the current image path from the parent window's state
+            window = self.window()
+            all_files = window.thumbnail_list.get_all_image_files()
+            if 0 <= window._current_index < len(all_files):
+                image_path = all_files[window._current_index]
                 try:
                     import subprocess
                     subprocess.Popen(['feh', image_path])
