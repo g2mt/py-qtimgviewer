@@ -504,9 +504,7 @@ class ImageViewer(QLabel):
         zoom_in_factor = 1.25
         zoom_out_factor = 1 / zoom_in_factor
 
-        old_pos = event.position()
         old_scale = self.scale_factor
-
         if event.angleDelta().y() > 0:
             self.scale_factor *= zoom_in_factor
         else:
@@ -515,20 +513,28 @@ class ImageViewer(QLabel):
         # Limit scale
         self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
         
-        self._update_display()
-
         if self.scroll_area:
-            # Calculate the adjustment needed to keep the mouse position fixed relative to the image
-            ratio = self.scale_factor / old_scale
+            # Position of mouse relative to the widget (ImageViewer)
+            mouse_pos = event.position()
             
+            # Position of mouse relative to the content (including scroll)
             h_bar = self.scroll_area.horizontalScrollBar()
             v_bar = self.scroll_area.verticalScrollBar()
+            
+            content_x = mouse_pos.x() + h_bar.value()
+            content_y = mouse_pos.y() + v_bar.value()
 
-            delta_x = (old_pos.x() + h_bar.value()) * ratio - old_pos.x()
-            delta_y = (old_pos.y() + v_bar.value()) * ratio - old_pos.y()
+            self._update_display()
 
-            h_bar.setValue(int(delta_x))
-            v_bar.setValue(int(delta_y))
+            # Calculate new scroll positions to keep mouse over same image point
+            ratio = self.scale_factor / old_scale
+            new_h = content_x * ratio - mouse_pos.x()
+            new_v = content_y * ratio - mouse_pos.y()
+
+            h_bar.setValue(int(new_h))
+            v_bar.setValue(int(new_v))
+        else:
+            self._update_display()
 
     def keyPressEvent(self, event):
         direction = {
@@ -564,6 +570,9 @@ class ImageViewer(QLabel):
             new_size = self.current_pixmap.size() * self.scale_factor
             self.setPixmap(self.current_pixmap.scaled(new_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             self.resize(new_size)
+        elif self.scroll_area:
+            # Ensure the placeholder text label fills the viewport to stay centered
+            self.resize(self.scroll_area.viewport().size())
     
     def mouseDoubleClickEvent(self, event):
         if self.current_pixmap and (tooltip := self.toolTip()):
