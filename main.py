@@ -515,7 +515,7 @@ class ImageViewer(QLabel):
         
         # Cursor-centered zoom adjustment
         if self.scroll_area:
-            pos = event.pos()
+            pos = event.position()
             h_bar = self.scroll_area.horizontalScrollBar()
             v_bar = self.scroll_area.verticalScrollBar()
             
