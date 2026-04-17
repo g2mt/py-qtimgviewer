@@ -513,7 +513,26 @@ class ImageViewer(QLabel):
         # Limit scale
         self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
         
-        self._update_display()
+        # Cursor-centered zoom adjustment
+        if self.scroll_area:
+            pos = event.pos()
+            h_bar = self.scroll_area.horizontalScrollBar()
+            v_bar = self.scroll_area.verticalScrollBar()
+            
+            old_h_val = h_bar.value()
+            old_v_val = v_bar.value()
+            
+            self._update_display()
+            
+            # Calculate new scroll values to keep the point under the cursor fixed
+            scale_ratio = self.scale_factor / old_scale
+            new_h_val = (old_h_val + pos.x()) * scale_ratio - pos.x()
+            new_v_val = (old_v_val + pos.y()) * scale_ratio - pos.y()
+            
+            h_bar.setValue(max(0, min(int(new_h_val), h_bar.maximum())))
+            v_bar.setValue(max(0, min(int(new_v_val), v_bar.maximum())))
+        else:
+            self._update_display()
 
     def keyPressEvent(self, event):
         direction = {
