@@ -513,21 +513,7 @@ class ImageViewer(QLabel):
         # Limit scale
         self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
         
-        if self.scroll_area:
-            # Position of mouse relative to the widget (ImageViewer)
-            mouse_pos = event.position()
-            
-            # Position of mouse relative to the content (including scroll)
-            h_bar = self.scroll_area.horizontalScrollBar()
-            v_bar = self.scroll_area.verticalScrollBar()
-            
-            content_x = mouse_pos.x() + h_bar.value()
-            content_y = mouse_pos.y() + v_bar.value()
-
-            self._update_display()
-
-        else:
-            self._update_display()
+        self._update_display()
 
     def keyPressEvent(self, event):
         direction = {
