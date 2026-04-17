@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction
 from PySide6.QtCore import (
     Qt, QSize, Signal, QTimer, QThread, Slot, QSettings,
-    QAbstractListModel, QModelIndex, QUrl, QObject, QPointF, QPoint
+    QAbstractListModel, QModelIndex, QUrl, QObject, QPointF, QPoint,
+    QEvent
 )
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QColor
 
@@ -522,12 +523,12 @@ class PanZoomImageViewer(QWidget):
             painter.drawText(self.rect(), Qt.AlignCenter, "Select an image from the sidebar")
             
     def event(self, event):
-        if event.type() == Qt.Gesture:
+        if event.type() == QEvent.Gesture:
             return self.gestureEvent(event)
         return super().event(event)
 
     def gestureEvent(self, event):
-        if pinch := event.gesture(Qt.PinchGesture):
+        if pinch := event.gesture(Qt.GestureType.PinchGesture):
             self.handlePinch(pinch)
         return True
 
