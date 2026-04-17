@@ -480,6 +480,7 @@ class PanZoomImageViewer(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_AcceptTouchEvents)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMinimumSize(400, 300)
         self.setStyleSheet("background-color: #2b2b2b;")
@@ -520,11 +521,33 @@ class PanZoomImageViewer(QWidget):
             painter.setPen(QColor("#888"))
             painter.drawText(self.rect(), Qt.AlignCenter, "Select an image from the sidebar")
             
+    def event(self, event):
+        if event.type() == Qt.Gesture:
+            return self.gestureEvent(event)
+        return super().event(event)
+
+    def gestureEvent(self, event):
+        if pinch := event.gesture(Qt.PinchGesture):
+            self.handlePinch(pinch)
+        return True
+
+    def handlePinch(self, pinch):
+        if not self._pixmap or self._pixmap.isNull():
+            return
+
+        old_scale = self._scale
+        self._scale *= pinch.scaleFactor()
+        self._scale = max(0.5, min(self._scale, 5.0))
+
+        pos = pinch.centerPoint()
+        self._offset = pos - (pos - self._offset) * (self._scale / old_scale)
+        self.update()
+
     def wheelEvent(self, event):
         if not self._pixmap or self._pixmap.isNull():
             return
             
-        if event.modifiers() & Qt.ControlModifier:
+        if event.modifiers() & Qt.ControlModifier or event.phase() == Qt.ScrollUpdate:
             zoom_in_factor = 1.1
             zoom_out_factor = 1 / zoom_in_factor
             
