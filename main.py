@@ -493,14 +493,14 @@ class PanZoomImageViewer(QWidget):
         
     def display_image(self, image_path: str):
         pixmap = QPixmap(image_path)
-        if not pixmap.isNull():
-            self._pixmap = pixmap
-            self._scale = 1.0
-            self._offset = QPointF(self.width() / 2, self.height() / 2)
-            self.update()
-        else:
-            self._pixmap = None
-            self.update()
+        self._pixmap = pixmap if not pixmap.isNull() else None
+        self._scale = 1.0
+        self._offset = QPointF(self.width() / 2, self.height() / 2)
+        self._is_dragging = False
+        self._drag_start_pos = None
+        self._drag_offset_start = None
+        self.setCursor(Qt.ArrowCursor)
+        self.update()
             
     def paintEvent(self, event):
         painter = QPainter(self)
