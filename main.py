@@ -530,7 +530,7 @@ class PanZoomImageViewer(QWidget):
             else:
                 self._scale *= zoom_out_factor
                 
-            self._scale = max(0.1, min(self._scale, 10.0))
+            self._scale = max(0.5, min(self._scale, 5.0))
             
             # Cursor-centered zoom
             pos = event.position()
@@ -542,7 +542,7 @@ class PanZoomImageViewer(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self._pixmap:
             self._is_dragging = True
-            self._drag_start_pos = event.pos()
+            self._drag_start_pos = event.position()
             self._drag_offset_start = self._offset
             self.setCursor(Qt.ClosedHandCursor)
         else:
@@ -550,7 +550,7 @@ class PanZoomImageViewer(QWidget):
             
     def mouseMoveEvent(self, event):
         if self._is_dragging:
-            self._offset = self._drag_offset_start + (event.pos() - self._drag_start_pos)
+            self._offset = self._drag_offset_start + (event.position() - self._drag_start_pos)
             self.update()
         else:
             super().mouseMoveEvent(event)
