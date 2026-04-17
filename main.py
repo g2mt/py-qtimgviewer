@@ -13,15 +13,15 @@ from queue import Queue
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QListWidget, QListWidgetItem, QLabel,
-    QSplitter, QScrollArea, QSizePolicy, QListView, QMessageBox, QTabWidget,
+    QSplitter, QSizePolicy, QListView, QMessageBox, QTabWidget,
     QMenu
 )
 from PySide6.QtGui import QAction
 from PySide6.QtCore import (
     Qt, QSize, Signal, QTimer, QThread, Slot, QSettings,
-    QAbstractListModel, QModelIndex, QUrl, QObject
+    QAbstractListModel, QModelIndex, QUrl, QObject, QPointF, QPoint
 )
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtGui import QPixmap, QIcon, QPainter, QColor
 
 # https://stackoverflow.com/a/4836734
 def natural_sorted(l): 
@@ -473,67 +473,95 @@ class ThumbnailListWidget(QListView):
             self._model.load_images(self._model.current_directory)
 
 
-class ImageViewer(QLabel):
-    """Widget for displaying the selected image with mouse-centered zoom."""
+class PanZoomImageViewer(QWidget):
+    """Custom widget for displaying images with pan and zoom support."""
     
     navigate = Signal(int)
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAlignment(Qt.AlignCenter)
-        self.setText("Select an image from the sidebar")
-        self.setStyleSheet("QLabel { background-color: #2b2b2b; color: #888; font-size: 14px; }")
-        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        self.setMinimumSize(400, 300)
         self.setFocusPolicy(Qt.StrongFocus)
-        self.current_pixmap: Optional[QPixmap] = None
-        self.scale_factor = 1.0
-        self.scroll_area: Optional[QScrollArea] = None
-
-    def set_scroll_area(self, scroll_area: QScrollArea):
-        self.scroll_area = scroll_area
-
-    def wheelEvent(self, event):
-        if not self.current_pixmap or self.current_pixmap.isNull():
-            return
-
-        if not (event.modifiers() & Qt.ControlModifier):
-            super().wheelEvent(event)
-            return
-
-        zoom_in_factor = 1.1
-        zoom_out_factor = 1 / zoom_in_factor
-
-        old_scale = self.scale_factor
-        if event.angleDelta().y() > 0:
-            self.scale_factor *= zoom_in_factor
-        else:
-            self.scale_factor *= zoom_out_factor
-
-        # Limit scale
-        self.scale_factor = max(0.1, min(self.scale_factor, 10.0))
+        self.setMinimumSize(400, 300)
+        self.setStyleSheet("background-color: #2b2b2b;")
         
-        # Cursor-centered zoom adjustment
-        if self.scroll_area:
-            pos = event.position()
-            h_bar = self.scroll_area.horizontalScrollBar()
-            v_bar = self.scroll_area.verticalScrollBar()
-            
-            old_h_val = h_bar.value()
-            old_v_val = v_bar.value()
-            
-            self._update_display()
-            
-            # Calculate new scroll values to keep the point under the cursor fixed
-            scale_ratio = self.scale_factor / old_scale
-            new_h_val = (old_h_val + pos.x()) * scale_ratio - pos.x()
-            new_v_val = (old_v_val + pos.y()) * scale_ratio - pos.y()
-            
-            h_bar.setValue(max(0, min(int(new_h_val), h_bar.maximum())))
-            v_bar.setValue(max(0, min(int(new_v_val), v_bar.maximum())))
+        self._pixmap: Optional[QPixmap] = None
+        self._offset = QPointF(0, 0)
+        self._scale = 1.0
+        self._drag_start_pos: Optional[QPoint] = None
+        self._drag_offset_start: Optional[QPointF] = None
+        self._is_dragging = False
+        
+    def display_image(self, image_path: str):
+        pixmap = QPixmap(image_path)
+        if not pixmap.isNull():
+            self._pixmap = pixmap
+            self._scale = 1.0
+            self._offset = QPointF(self.width() / 2, self.height() / 2)
+            self.update()
         else:
-            self._update_display()
-
+            self._pixmap = None
+            self.update()
+            
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.fillRect(self.rect(), QColor("#2b2b2b"))
+        
+        if self._pixmap and not self._pixmap.isNull():
+            painter.translate(self._offset)
+            painter.scale(self._scale, self._scale)
+            painter.translate(-self._pixmap.width() / 2, -self._pixmap.height() / 2)
+            painter.drawPixmap(0, 0, self._pixmap)
+        else:
+            painter.setPen(QColor("#888"))
+            painter.drawText(self.rect(), Qt.AlignCenter, "Select an image from the sidebar")
+            
+    def wheelEvent(self, event):
+        if not self._pixmap or self._pixmap.isNull():
+            return
+            
+        if event.modifiers() & Qt.ControlModifier:
+            zoom_in_factor = 1.1
+            zoom_out_factor = 1 / zoom_in_factor
+            
+            old_scale = self._scale
+            if event.angleDelta().y() > 0:
+                self._scale *= zoom_in_factor
+            else:
+                self._scale *= zoom_out_factor
+                
+            self._scale = max(0.1, min(self._scale, 10.0))
+            
+            # Cursor-centered zoom
+            pos = event.position()
+            self._offset = pos - (pos - self._offset) * (self._scale / old_scale)
+            self.update()
+        else:
+            super().wheelEvent(event)
+            
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self._pixmap:
+            self._is_dragging = True
+            self._drag_start_pos = event.pos()
+            self._drag_offset_start = self._offset
+            self.setCursor(Qt.ClosedHandCursor)
+        else:
+            super().mousePressEvent(event)
+            
+    def mouseMoveEvent(self, event):
+        if self._is_dragging:
+            self._offset = self._drag_offset_start + (event.pos() - self._drag_start_pos)
+            self.update()
+        else:
+            super().mouseMoveEvent(event)
+            
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._is_dragging = False
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            super().mouseReleaseEvent(event)
+            
     def keyPressEvent(self, event):
         direction = {
             Qt.Key_Left: -1,
@@ -545,35 +573,15 @@ class ImageViewer(QLabel):
             self.navigate.emit(direction)
         else:
             super().keyPressEvent(event)
-    
-    def display_image(self, image_path: str):
-        pixmap = QPixmap(image_path)
-        if not pixmap.isNull():
-            self.current_pixmap = pixmap
-            # Reset zoom when loading new image
-            self.scale_factor = 1.0
-            if self.scroll_area:
-                # Fit to viewport initially
-                view_size = self.scroll_area.viewport().size()
-                self.scale_factor = min(view_size.width() / pixmap.width(), 
-                                       view_size.height() / pixmap.height(), 1.0)
-            self._update_display()
-        else:
-            self.setText(f"Failed to load image:\n{image_path}")
-            self.current_pixmap = None
-    
-    def _update_display(self):
-        if self.current_pixmap and not self.current_pixmap.isNull():
-            new_size = self.current_pixmap.size() * self.scale_factor
-            self.setPixmap(self.current_pixmap.scaled(new_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            self.resize(new_size)
-        elif self.scroll_area:
-            # Ensure the placeholder text label fills the viewport to stay centered
-            self.resize(self.scroll_area.viewport().size())
-    
+            
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._pixmap and self._scale == 1.0:
+            self._offset = QPointF(self.width() / 2, self.height() / 2)
+            self.update()
+
     def mouseDoubleClickEvent(self, event):
-        if self.current_pixmap:
-            # Get the current image path from the parent window's state
+        if self._pixmap:
             window = self.window()
             all_files = window.thumbnail_list.get_all_image_files()
             if 0 <= window._current_index < len(all_files):
@@ -715,15 +723,8 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.thumbnail_list)
         
         # Image viewer
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(False)
-        self.scroll_area.setAlignment(Qt.AlignCenter)
-        self.scroll_area.setStyleSheet("QScrollArea { background-color: #2b2b2b; border: none; }")
-        
-        self.image_viewer = ImageViewer()
-        self.image_viewer.set_scroll_area(self.scroll_area)
+        self.image_viewer = PanZoomImageViewer()
         self.image_viewer.navigate.connect(self._navigate_image)
-        self.scroll_area.setWidget(self.image_viewer)
 
         # Connect widgets to image filter
         self.filter_input.textChanged.connect(self.image_filter.set_filter_text)
@@ -733,8 +734,8 @@ class MainWindow(QMainWindow):
         # Add widgets to splitter
         self.splitter.addWidget(self.sidebar)
         self.sidebar.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
-        self.splitter.addWidget(self.scroll_area)
-        self.scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.splitter.addWidget(self.image_viewer)
+        self.image_viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setCollapsible(0, False)
