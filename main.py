@@ -566,77 +566,16 @@ class PanZoomImageViewer(QWidget):
             self.update()
         else:
             delta = event.angleDelta().y()
-            scroll_step = 50
+            scroll_step = 20
             if delta > 0:
-                self._offset = self._offset + QPointF(0, -scroll_step)
-            elif delta < 0:
                 self._offset = self._offset + QPointF(0, scroll_step)
+            elif delta < 0:
+                self._offset = self._offset - QPointF(0, scroll_step)
             else:
                 return
-            self._clamp_offset()
             self.update()
             event.accept()
-    
-    def _clamp_offset(self):
-        if not self._pixmap:
-            return
-        pw = self._pixmap.width()
-        ph = self._pixmap.height()
-        w = self.width()
-        h = self.height()
-        s = self._scale
-        half_pw = pw * s / 2
-        half_ph = ph * s / 2
-        min_x = half_pw
-        max_x = w - half_pw
-        min_y = half_ph
-        max_y = h - half_ph
-        if min_x > max_x:
-            center = w / 2
-            self._offset.setX(center)
-        else:
-            self._offset.setX(max(min_x, min(max_x, self._offset.x())))
-        if min_y > max_y:
-            center_y = h / 2
-            self._offset.setY(center_y)
-        else:
-            self._offset.setY(max(min_y, min(max_y, self._offset.y())))
-    
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self._pixmap:
-            self._is_dragging = True
-            self._drag_start_pos = event.position()
-            self._drag_offset_start = self._offset
-            self.setCursor(Qt.ClosedHandCursor)
-        else:
-            super().mousePressEvent(event)
-            
-    def mouseMoveEvent(self, event):
-        if self._is_dragging:
-            self._offset = self._drag_offset_start + (event.position() - self._drag_start_pos)
-            self.update()
-        else:
-            super().mouseMoveEvent(event)
-            
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._is_dragging = False
-            self.setCursor(Qt.ArrowCursor)
-        else:
-            super().mouseReleaseEvent(event)
-            
-    def keyPressEvent(self, event):
-        direction = {
-            Qt.Key_Left: -1,
-            Qt.Key_Right: 1,
-            Qt.Key_Up: -1,
-            Qt.Key_Down: 1
-        }.get(event.key())
-        if direction:
-            self.navigate.emit(direction)
-        else:
-            super().keyPressEvent(event)
-            
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._pixmap and self._scale == 1.0:
