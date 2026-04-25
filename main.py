@@ -548,7 +548,7 @@ class PanZoomImageViewer(QWidget):
         if not self._pixmap or self._pixmap.isNull():
             return
             
-        if event.modifiers() & Qt.ControlModifier or event.phase() == Qt.ScrollUpdate:
+        if event.modifiers() & Qt.ControlModifier:
             zoom_in_factor = 1.1
             zoom_out_factor = 1 / zoom_in_factor
             
