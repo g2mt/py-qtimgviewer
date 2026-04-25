@@ -565,8 +565,43 @@ class PanZoomImageViewer(QWidget):
             self._offset = pos - (pos - self._offset) * (self._scale / old_scale)
             self.update()
         else:
-            super().wheelEvent(event)
-            
+            delta = event.angleDelta().y()
+            scroll_step = 50
+            if delta > 0:
+                self._offset = self._offset + QPointF(0, -scroll_step)
+            elif delta < 0:
+                self._offset = self._offset + QPointF(0, scroll_step)
+            else:
+                return
+            self._clamp_offset()
+            self.update()
+            event.accept()
+    
+    def _clamp_offset(self):
+        if not self._pixmap:
+            return
+        pw = self._pixmap.width()
+        ph = self._pixmap.height()
+        w = self.width()
+        h = self.height()
+        s = self._scale
+        half_pw = pw * s / 2
+        half_ph = ph * s / 2
+        min_x = half_pw
+        max_x = w - half_pw
+        min_y = half_ph
+        max_y = h - half_ph
+        if min_x > max_x:
+            center = w / 2
+            self._offset.setX(center)
+        else:
+            self._offset.setX(max(min_x, min(max_x, self._offset.x())))
+        if min_y > max_y:
+            center_y = h / 2
+            self._offset.setY(center_y)
+        else:
+            self._offset.setY(max(min_y, min(max_y, self._offset.y())))
+    
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and self._pixmap:
             self._is_dragging = True
