@@ -3,7 +3,7 @@
 import faulthandler, signal
 faulthandler.register(signal.SIGUSR1)
 
-import sys, os, hashlib, platform, csv, re
+import sys, os, hashlib, platform, csv, re, zipfile, tempfile, shutil
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -29,6 +29,10 @@ def natural_sorted(l):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(l, key=alphanum_key)
+
+
+# Supported image file extensions
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'}
 
 
 @dataclass
@@ -270,11 +274,16 @@ class DirectoryListWidget(QListWidget):
             self.addItem(item)
             self.directory_to_item[parent_dir] = item
         
-        # Get subdirectories
+        # Get subdirectories and zip files
         try:
             for entry in os.scandir(directory):
                 if entry.is_dir() and not entry.name.startswith('.'):
                     item = QListWidgetItem(entry.name)
+                    item.setToolTip(entry.path)
+                    self.addItem(item)
+                    self.directory_to_item[entry.path] = item
+                elif entry.is_file() and entry.name.lower().endswith('.zip'):
+                    item = QListWidgetItem(f"{entry.name}  (zip)")
                     item.setToolTip(entry.path)
                     self.addItem(item)
                     self.directory_to_item[entry.path] = item
@@ -392,11 +401,13 @@ class ThumbnailModel(QAbstractListModel):
             self.loader.stop()
             self.loader.wait()
         
-        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'}
-        
         try:
-            all_images = natural_sorted([entry.path for entry in os.scandir(directory)
-                               if entry.is_file() and os.path.splitext(entry.name)[1].lower() in image_extensions])
+            all_images = []
+            for root, dirs, files in os.walk(directory):
+                for f in files:
+                    if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS:
+                        all_images.append(os.path.join(root, f))
+            all_images = natural_sorted(all_images)
         except PermissionError:
             return
         
@@ -607,6 +618,9 @@ class MainWindow(QMainWindow):
         self.sidebar_visible = True
         self._new_thumbnail_loaded = False
         self._current_index = -1
+        self._temp_dir = None
+        self._is_in_zip = False
+        self._zip_path = None
         
         self.setWindowTitle("Image Viewer")
         self.setWindowIcon(QIcon.fromTheme("multimedia-photo-manager"))
@@ -745,9 +759,35 @@ class MainWindow(QMainWindow):
     
     def _load_images(self, directory: str = None):
         self.image_directory = directory or self.image_directory
-        self.thumbnail_list.load_images(self.image_directory)
-        self.directory_list.load_directories(self.image_directory)
-        self.setWindowTitle(f"Image Viewer - {self.image_directory}")
+        self._cleanup_temp_dir()
+        
+        actual_directory = self.image_directory
+        self._is_in_zip = False
+        
+        if (os.path.isfile(actual_directory) and 
+            actual_directory.lower().endswith('.zip')):
+            self._is_in_zip = True
+            self._zip_path = actual_directory
+            self._temp_dir = tempfile.mkdtemp(prefix='imgviewer_')
+            try:
+                with zipfile.ZipFile(actual_directory, 'r') as zf:
+                    for name in zf.namelist():
+                        lower_name = name.lower()
+                        if any(lower_name.endswith(ext) for ext in IMAGE_EXTENSIONS):
+                            zf.extract(name, self._temp_dir)
+                actual_directory = self._temp_dir
+            except Exception:
+                pass
+        
+        self.thumbnail_list.load_images(actual_directory)
+        
+        if self._is_in_zip:
+            parent_dir = os.path.dirname(self._zip_path)
+            self.directory_list.load_directories(parent_dir)
+            self.setWindowTitle(f"Image Viewer - {os.path.basename(self._zip_path)} (zip)")
+        else:
+            self.directory_list.load_directories(actual_directory)
+            self.setWindowTitle(f"Image Viewer - {self.image_directory}")
 
         config = Config.load()
         if config.tags_path:
@@ -790,8 +830,15 @@ class MainWindow(QMainWindow):
         )
         QTimer.singleShot(0, lambda: self.splitter.setSizes([0, 1]))
     
+    def _cleanup_temp_dir(self):
+        if self._temp_dir is not None and os.path.isdir(self._temp_dir):
+            print(f"Cleaning up temp dir {self._temp_dir}")
+            shutil.rmtree(self._temp_dir, ignore_errors=True)
+            self._temp_dir = None
+    
     def closeEvent(self, event):
         self.thumbnail_list.cleanup()
+        self._cleanup_temp_dir()
         super().closeEvent(event)
 
 
