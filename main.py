@@ -593,7 +593,7 @@ class PanZoomImageViewer(QWidget):
             self._offset = QPointF(self.width() / 2, self.height() / 2)
             self.update()
 
-    def mouseDoubleClickEvent(self, event):
+    def mousePressEvent(self, event):
         if self._pixmap:
             x = event.position().x()
             third = self.width() / 3
@@ -601,7 +601,7 @@ class PanZoomImageViewer(QWidget):
                 self.navigate.emit(-1)
             elif x > self.width() - third:
                 self.navigate.emit(1)
-        super().mouseDoubleClickEvent(event)
+        super().mousePressEvent(event)
 
 
 class MainWindow(QMainWindow):
