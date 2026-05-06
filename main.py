@@ -595,17 +595,12 @@ class PanZoomImageViewer(QWidget):
 
     def mouseDoubleClickEvent(self, event):
         if self._pixmap:
-            window = self.window()
-            all_files = window.thumbnail_list.get_all_image_files()
-            if 0 <= window._current_index < len(all_files):
-                image_path = all_files[window._current_index]
-                try:
-                    import subprocess
-                    subprocess.Popen(['feh', image_path])
-                except FileNotFoundError:
-                    QMessageBox.critical(self, "Error", "feh is not installed or not found in PATH.\n\nInstall it with: sudo apt install feh")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to launch feh:\n{str(e)}")
+            x = event.position().x()
+            third = self.width() / 3
+            if x < third:
+                self.navigate.emit(-1)
+            elif x > self.width() - third:
+                self.navigate.emit(1)
         super().mouseDoubleClickEvent(event)
 
 
