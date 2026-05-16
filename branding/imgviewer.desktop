@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Image Viewer
+Comment=A simple Qt-based image viewer
+Exec=imgviewer
+Icon=imgviewer
+Type=Application
+Categories=Qt;Graphics;Viewer;

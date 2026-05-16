@@ -31,3 +31,18 @@ add_executable(imgviewer
 target_compile_definitions(imgviewer PRIVATE -DQT_DEPRECATED_WARNINGS)
 target_include_directories(imgviewer PRIVATE src/include)
 target_link_libraries(imgviewer Qt6::Widgets)
+
+include(GNUInstallDirs)
+
+install(TARGETS imgviewer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(
+  FILES branding/logo-circle.png
+  RENAME imgviewer.png
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/icons
+)
+
+install(
+  FILES branding/imgviewer.desktop
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)
