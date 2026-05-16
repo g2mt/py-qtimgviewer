@@ -8,6 +8,16 @@
 #include <QResizeEvent>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWheelEvent>
+#include <algorithm>
+
+namespace {
+// Multiplicative zoom factor applied per wheel "notch" (120 eighths of a
+// degree, the standard step on most mice).
+constexpr float kZoomStepPerNotch = 1.15f;
+constexpr float kMinZoom = 0.01f;
+constexpr float kMaxZoom = 100.0f;
+} // namespace
 
 ImageView::ImageView(QWidget *parent) : QFrame(parent) {
   QVBoxLayout *layout = new QVBoxLayout(this);
@@ -23,11 +33,28 @@ ImageView::ImageView(QWidget *parent) : QFrame(parent) {
 
 void ImageView::setImage(const QString &path) {
   m_pixmap = QPixmap(path);
-  m_panOffset = QPoint(0, 0);
+  resetCamera();
   updateImageDisplay();
 }
 
 bool ImageView::hasImage() const { return !m_pixmap.isNull(); }
+
+void ImageView::resetCamera() {
+  if (!hasImage()) {
+    m_camera = Camera{};
+    return;
+  }
+
+  // Fit the image to the widget width and center it vertically. The image's
+  // top-left corner (0, 0) is taken as the camera target so `offset` is the
+  // on-screen position of that corner.
+  const float fitZoom =
+      m_pixmap.width() > 0 ? float(width()) / float(m_pixmap.width()) : 1.0f;
+  m_camera.zoom = fitZoom > 0.0f ? fitZoom : 1.0f;
+  m_camera.imageTarget = QPointF(0.0, 0.0);
+  m_camera.offset =
+      QPointF(0.0, (height() - m_pixmap.height() * m_camera.zoom) / 2.0);
+}
 
 void ImageView::updateImageDisplay() {
   m_placeholder->setVisible(!hasImage());
@@ -43,11 +70,14 @@ void ImageView::paintEvent(QPaintEvent *event) {
     return;
 
   QPainter painter(this);
-  QPixmap scaled =
-      m_pixmap.scaledToWidth(width(), Qt::SmoothTransformation);
-  int x = m_panOffset.x();
-  int y = (height() - scaled.height()) / 2 + m_panOffset.y();
-  painter.drawPixmap(x, y, scaled);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
+  // The destination rectangle is the image's bounds mapped through the camera.
+  const QPointF topLeft = m_camera.imageToScreen(QPointF(0.0, 0.0));
+  const QSizeF dstSize(m_pixmap.width() * m_camera.zoom,
+                       m_pixmap.height() * m_camera.zoom);
+  painter.drawPixmap(QRectF(topLeft, dstSize), m_pixmap,
+                     QRectF(m_pixmap.rect()));
 }
 
 void ImageView::resizeEvent(QResizeEvent *event) {
@@ -95,7 +125,7 @@ void ImageView::dropEvent(QDropEvent *event) {
 void ImageView::mousePressEvent(QMouseEvent *event) {
   if (hasImage() && event->button() == Qt::LeftButton) {
     m_panning = true;
-    m_lastMousePos = event->pos();
+    m_lastMousePos = event->position();
     setCursor(Qt::ClosedHandCursor);
   }
   QFrame::mousePressEvent(event);
@@ -103,9 +133,9 @@ void ImageView::mousePressEvent(QMouseEvent *event) {
 
 void ImageView::mouseMoveEvent(QMouseEvent *event) {
   if (m_panning) {
-    QPoint delta = event->pos() - m_lastMousePos;
-    m_panOffset += delta;
-    m_lastMousePos = event->pos();
+    const QPointF delta = event->position() - m_lastMousePos;
+    m_camera.offset += delta;
+    m_lastMousePos = event->position();
     update();
   }
   QFrame::mouseMoveEvent(event);
@@ -117,4 +147,27 @@ void ImageView::mouseReleaseEvent(QMouseEvent *event) {
     setCursor(Qt::ArrowCursor);
   }
   QFrame::mouseReleaseEvent(event);
+}
+
+void ImageView::wheelEvent(QWheelEvent *event) {
+  if (!hasImage()) {
+    QFrame::wheelEvent(event);
+    return;
+  }
+
+  // Zoom around the cursor by re-anchoring the camera: the image point
+  // currently under the cursor is recorded, the zoom is updated, and the
+  // camera is configured so that same image point still lands at the cursor.
+  const QPointF cursor = event->position();
+  const QPointF imagePointUnderCursor = m_camera.screenToImage(cursor);
+
+  const float notches = event->angleDelta().y() / 120.0f;
+  const float factor = std::pow(kZoomStepPerNotch, notches);
+  m_camera.zoom = std::clamp(m_camera.zoom * factor, kMinZoom, kMaxZoom);
+
+  m_camera.imageTarget = imagePointUnderCursor;
+  m_camera.offset = cursor;
+
+  update();
+  event->accept();
 }
