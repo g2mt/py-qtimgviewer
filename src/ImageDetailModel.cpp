@@ -90,31 +90,18 @@ void ImageDetailModel::reload() {
   dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
 
   QFileInfoList entries = dir.entryInfoList();
-
-  entries.removeIf([](const QFileInfo &info) {
-    return QImageReader::imageFormat(info.absoluteFilePath()).isEmpty();
-  });
-
   const QString search = m_filter->search();
-  if (!search.isEmpty()) {
-    QFileInfoList filtered;
-    filtered.reserve(entries.size());
-    for (const auto &info : entries) {
-      if (info.fileName().contains(search, Qt::CaseInsensitive))
-        filtered.append(info);
-    }
-    entries = std::move(filtered);
-  }
-
-  if (!m_filter->tags().isEmpty()) {
-    QFileInfoList filtered;
-    filtered.reserve(entries.size());
-    for (const auto &info : entries) {
-      if (m_filter->fileHasTags(info.absoluteFilePath()))
-        filtered.append(info);
-    }
-    entries = std::move(filtered);
-  }
+  const QStringList tags = m_filter->tags();
+  entries.removeIf([&](const QFileInfo &info) {
+    if (QImageReader::imageFormat(info.absoluteFilePath()).isEmpty())
+      return true;
+    if (!search.isEmpty() &&
+        !info.fileName().contains(search, Qt::CaseInsensitive))
+      return true;
+    if (!tags.isEmpty() && !m_filter->fileHasTags(info.absoluteFilePath()))
+      return true;
+    return false;
+  });
 
   QCollator collator;
   collator.setCaseSensitivity(Qt::CaseInsensitive);
