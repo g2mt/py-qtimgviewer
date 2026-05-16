@@ -10,12 +10,6 @@
 
 namespace {
 
-const QStringList &imageNameFilters() {
-  static const QStringList kFilters = {"*.png",  "*.jpg",  "*.jpeg", "*.bmp",
-                                       "*.gif",  "*.webp", "*.tiff", "*.tif"};
-  return kFilters;
-}
-
 // Decodes a single image at reduced size on the global thread pool, then
 // hands the result back to the model on its owning thread via a queued
 // invocation. Uses QPointer so that destroying the model while jobs are
@@ -93,10 +87,13 @@ void ImageDetailModel::reload() {
   m_pending.clear();
 
   QDir dir = m_filter->currentPath();
-  dir.setNameFilters(imageNameFilters());
   dir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
 
   QFileInfoList entries = dir.entryInfoList();
+
+  entries.removeIf([](const QFileInfo &info) {
+    return QImageReader::imageFormat(info.absoluteFilePath()).isEmpty();
+  });
 
   const QString search = m_filter->search();
   if (!search.isEmpty()) {
@@ -140,8 +137,8 @@ void ImageDetailModel::requestThumbnail(const QString &path) const {
   if (m_pending.contains(path))
     return;
   m_pending.insert(path);
-  auto *loader = new ThumbnailLoader(const_cast<ImageDetailModel *>(this),
-                                     path, kThumbnailSize);
+  auto *loader = new ThumbnailLoader(const_cast<ImageDetailModel *>(this), path,
+                                     kThumbnailSize);
   QThreadPool::globalInstance()->start(loader);
 }
 

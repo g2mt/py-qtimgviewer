@@ -18,9 +18,11 @@ MainWindow::MainWindow() {
   mainLayout->setSpacing(0);
   setCentralWidget(centralWidget);
 
-  QToolBar *toolbar = new QToolBar(this);
-  addToolBar(toolbar);
-  setupToolbar(toolbar);
+  setupMenuBar();
+
+  m_toolbar = new QToolBar(this);
+  addToolBar(m_toolbar);
+  setupToolbar(m_toolbar);
   setupMainLayout(mainLayout);
 }
 
@@ -77,12 +79,41 @@ void MainWindow::setupToolbar(QToolBar *toolbar) {
   toolbar->addWidget(filterBtn);
 }
 
-void MainWindow::setupMainLayout(QVBoxLayout *mainLayout) {
-  QSplitter *horizontalSplitter = new QSplitter(Qt::Horizontal);
-  mainLayout->addWidget(horizontalSplitter);
+void MainWindow::setupMenuBar() {
+  m_menuBar = new QMenuBar(this);
+  setMenuBar(m_menuBar);
 
-  ImageView *imageView = setupImageView(horizontalSplitter);
-  setupRightSplitter(horizontalSplitter, imageView);
+  QMenu *fileMenu = m_menuBar->addMenu("&File");
+  QAction *quitAction = fileMenu->addAction("&Quit");
+  quitAction->setShortcut(QKeySequence("Ctrl+Q"));
+  connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
+
+  QMenu *viewMenu = m_menuBar->addMenu("&View");
+  m_collapseViewAction = viewMenu->addAction("&Collapse View");
+  m_collapseViewAction->setShortcut(QKeySequence("Tab"));
+  m_collapseViewAction->setCheckable(true);
+  connect(m_collapseViewAction, &QAction::triggered, this,
+          &MainWindow::toggleCollapseView);
+
+  QMenu *filterMenu = m_menuBar->addMenu("Fil&ter");
+  setupFilterMenu(filterMenu);
+}
+
+void MainWindow::toggleCollapseView() {
+  bool collapsed = m_collapseViewAction->isChecked();
+  m_toolbar->setVisible(!collapsed);
+  m_menuBar->setVisible(!collapsed);
+  m_rightSplitter->setVisible(!collapsed);
+}
+
+void MainWindow::setupMainLayout(QVBoxLayout *mainLayout) {
+  m_horizontalSplitter = new QSplitter(Qt::Horizontal);
+  mainLayout->addWidget(m_horizontalSplitter);
+
+  m_imageView = setupImageView(m_horizontalSplitter);
+  connect(m_imageView, &ImageView::collapseRequested, m_collapseViewAction,
+          &QAction::trigger);
+  setupRightSplitter(m_horizontalSplitter, m_imageView);
 }
 
 ImageView *MainWindow::setupImageView(QSplitter *horizontalSplitter) {
@@ -95,14 +126,14 @@ ImageView *MainWindow::setupImageView(QSplitter *horizontalSplitter) {
 
 void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
                                     ImageView *imageView) {
-  QSplitter *rightSplitter = new QSplitter(Qt::Vertical);
+  m_rightSplitter = new QSplitter(Qt::Vertical);
 
   QTabWidget *tabs = new QTabWidget();
   DirectoryList *dirList = new DirectoryList(&filter);
   tabs->addTab(dirList, "Directory");
   TagList *tagList = new TagList();
   tabs->addTab(tagList, "Tags");
-  rightSplitter->addWidget(tabs);
+  m_rightSplitter->addWidget(tabs);
   connect(tagList, &TagList::itemSelectionChanged, [this, tagList]() {
     QList<QString> list;
     for (auto item : tagList->selectedItems())
@@ -111,11 +142,11 @@ void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
   });
 
   ImageDetailList *imageList = new ImageDetailList(&filter);
-  rightSplitter->addWidget(imageList);
+  m_rightSplitter->addWidget(imageList);
   connect(imageList, &ImageDetailList::imageActivated, imageView,
           &ImageView::setImage);
 
-  horizontalSplitter->addWidget(rightSplitter);
+  horizontalSplitter->addWidget(m_rightSplitter);
   horizontalSplitter->setStretchFactor(1, 1);
   horizontalSplitter->setCollapsible(1, false);
 }

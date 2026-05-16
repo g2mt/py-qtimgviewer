@@ -48,13 +48,12 @@ public:
     const QRect textRect(textLeft, option.rect.top(),
                          option.rect.right() - textLeft - kThumbnailMargin,
                          option.rect.height());
-    const QString name =
-        index.data(ImageDetailModel::FileNameRole).toString();
+    const QString name = index.data(ImageDetailModel::FileNameRole).toString();
     painter->setPen((option.state & QStyle::State_Selected)
                         ? option.palette.highlightedText().color()
                         : option.palette.text().color());
-    const QString elided = option.fontMetrics.elidedText(
-        name, Qt::ElideMiddle, textRect.width());
+    const QString elided =
+        option.fontMetrics.elidedText(name, Qt::ElideMiddle, textRect.width());
     painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, elided);
 
     painter->restore();
@@ -80,8 +79,7 @@ ImageDetailList::ImageDetailList(Filter *filter, QWidget *parent)
 }
 
 void ImageDetailList::onClicked(const QModelIndex &index) {
-  const QString path =
-      index.data(ImageDetailModel::FilePathRole).toString();
+  const QString path = index.data(ImageDetailModel::FilePathRole).toString();
   if (!path.isEmpty())
     emit imageActivated(path);
 }

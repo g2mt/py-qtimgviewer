@@ -1,7 +1,7 @@
-#include <imgviewer/ImageView.h>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QImageReader>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -10,6 +10,7 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 #include <algorithm>
+#include <imgviewer/ImageView.h>
 
 namespace {
 // Multiplicative zoom factor applied per wheel "notch" (120 eighths of a
@@ -91,14 +92,7 @@ void ImageView::dragEnterEvent(QDragEnterEvent *event) {
     for (const QUrl &url : event->mimeData()->urls()) {
       if (url.isLocalFile()) {
         QString path = url.toLocalFile();
-        if (path.endsWith(".png", Qt::CaseInsensitive) ||
-            path.endsWith(".jpg", Qt::CaseInsensitive) ||
-            path.endsWith(".jpeg", Qt::CaseInsensitive) ||
-            path.endsWith(".bmp", Qt::CaseInsensitive) ||
-            path.endsWith(".gif", Qt::CaseInsensitive) ||
-            path.endsWith(".webp", Qt::CaseInsensitive) ||
-            path.endsWith(".tiff", Qt::CaseInsensitive) ||
-            path.endsWith(".tif", Qt::CaseInsensitive)) {
+        if (!QImageReader::imageFormat(path).isEmpty()) {
           event->acceptProposedAction();
           return;
         }
@@ -120,6 +114,14 @@ void ImageView::dropEvent(QDropEvent *event) {
       }
     }
   }
+}
+
+void ImageView::keyPressEvent(QKeyEvent *event) {
+  if (event->key() == Qt::Key_Tab) {
+    emit collapseRequested();
+    return;
+  }
+  QFrame::keyPressEvent(event);
 }
 
 void ImageView::mousePressEvent(QMouseEvent *event) {
