@@ -1,13 +1,10 @@
 #include <QApplication>
-#include <QLabel>
+#include <imgviewer/MainWindow.h>
 
 int main(int argc, char *argv[]) {
   QApplication app(argc, argv);
-
-  QLabel label("Hello World");
-  label.setAlignment(Qt::AlignCenter);
-  label.resize(300, 200);
-  label.show();
-
+  MainWindow win;
+  win.resize(1000, 700);
+  win.show();
   return app.exec();
 }
