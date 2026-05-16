@@ -53,8 +53,7 @@ void ImageView::resetCamera() {
       m_pixmap.width() > 0 ? float(width()) / float(m_pixmap.width()) : 1.0f;
   m_camera.zoom = fitZoom > 0.0f ? fitZoom : 1.0f;
   m_camera.imageTarget = QPointF(0.0, 0.0);
-  m_camera.offset =
-      QPointF(0.0, (height() - m_pixmap.height() * m_camera.zoom) / 2.0);
+  m_camera.offset = QPointF(0.0, 0.0);
 }
 
 void ImageView::updateImageDisplay() {
