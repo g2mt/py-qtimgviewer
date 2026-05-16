@@ -116,14 +116,6 @@ void ImageView::dropEvent(QDropEvent *event) {
   }
 }
 
-void ImageView::keyPressEvent(QKeyEvent *event) {
-  if (event->key() == Qt::Key_Tab) {
-    emit collapseRequested();
-    return;
-  }
-  QFrame::keyPressEvent(event);
-}
-
 void ImageView::mousePressEvent(QMouseEvent *event) {
   if (hasImage() && event->button() == Qt::LeftButton) {
     m_panning = true;

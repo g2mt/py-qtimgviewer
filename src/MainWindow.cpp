@@ -24,6 +24,9 @@ MainWindow::MainWindow() {
   addToolBar(m_toolbar);
   setupToolbar(m_toolbar);
   setupMainLayout(mainLayout);
+
+  installEventFilter(this);
+  setupEventFilters(this);
 }
 
 void MainWindow::setupFilterMenu(QMenu *filterMenu) {
@@ -111,8 +114,6 @@ void MainWindow::setupMainLayout(QVBoxLayout *mainLayout) {
   mainLayout->addWidget(m_horizontalSplitter);
 
   m_imageView = setupImageView(m_horizontalSplitter);
-  connect(m_imageView, &ImageView::collapseRequested, m_collapseViewAction,
-          &QAction::trigger);
   setupRightSplitter(m_horizontalSplitter, m_imageView);
 }
 
@@ -149,4 +150,25 @@ void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
   horizontalSplitter->addWidget(m_rightSplitter);
   horizontalSplitter->setStretchFactor(1, 1);
   horizontalSplitter->setCollapsible(1, false);
+}
+
+void MainWindow::setupEventFilters(QObject *obj) {
+  for (QObject *child : obj->children()) {
+    if (child->isWidgetType()) {
+      child->installEventFilter(this);
+    }
+    setupEventFilters(child);
+  }
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+  if (event->type() == QEvent::KeyPress) {
+    QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+
+    if (keyEvent->key() == Qt::Key_Tab) {
+      m_collapseViewAction->trigger();
+      return false;
+    }
+  }
+  return QMainWindow::eventFilter(watched, event);
 }

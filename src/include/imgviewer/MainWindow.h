@@ -1,5 +1,6 @@
 #pragma once
 #include "Filter.h"
+#include <QKeyEvent>
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
@@ -26,6 +27,9 @@ class MainWindow : public QMainWindow {
   ImageView *setupImageView(QSplitter *horizontalSplitter);
   void setupRightSplitter(QSplitter *horizontalSplitter, ImageView *imageView);
   void toggleCollapseView();
+
+  void setupEventFilters(QObject *obj);
+  bool eventFilter(QObject *watched, QEvent *event);
 
 public:
   MainWindow();
