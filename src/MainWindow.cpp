@@ -13,6 +13,7 @@
 #include <imgviewer/TagListContainer.h>
 #include <imgviewer/MainWindow.h>
 #include <imgviewer/TagList.h>
+#include <imgviewer/ImageDetailList.h>
 
 MainWindow::MainWindow() {
   QSettings settings;
@@ -73,8 +74,10 @@ void MainWindow::setupFilterMenu(QMenu *filterMenu) {
 }
 
 void MainWindow::setupToolbar(QToolBar *toolbar) {
-  toolbar->addAction(QIcon::fromTheme("go-previous"), "Back");
-  toolbar->addAction(QIcon::fromTheme("go-next"), "Forward");
+  m_backAction = toolbar->addAction(QIcon::fromTheme("go-previous"), "Back");
+  m_forwardAction = toolbar->addAction(QIcon::fromTheme("go-next"), "Forward");
+  m_backAction->setEnabled(false);
+  m_forwardAction->setEnabled(false);
 
   QWidget *spacer = new QWidget();
   spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -139,20 +142,18 @@ void MainWindow::setupMainLayout(QVBoxLayout *mainLayout) {
   m_horizontalSplitter = new QSplitter(Qt::Horizontal);
   mainLayout->addWidget(m_horizontalSplitter);
 
-  m_imageView = setupImageView(m_horizontalSplitter);
-  setupRightSplitter(m_horizontalSplitter, m_imageView);
+  setupImageView(m_horizontalSplitter);
+  setupRightSplitter(m_horizontalSplitter);
 }
 
-ImageView *MainWindow::setupImageView(QSplitter *horizontalSplitter) {
-  ImageView *imageView = new ImageView();
-  horizontalSplitter->addWidget(imageView);
+void MainWindow::setupImageView(QSplitter *horizontalSplitter) {
+  m_imageView = new ImageView();
+  horizontalSplitter->addWidget(m_imageView);
   horizontalSplitter->setStretchFactor(0, 6);
   horizontalSplitter->setCollapsible(0, false);
-  return imageView;
 }
 
-void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
-                                    ImageView *imageView) {
+void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter) {
   m_rightSplitter = new QSplitter(Qt::Vertical);
 
   QTabWidget *tabs = new QTabWidget();
@@ -163,17 +164,38 @@ void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
   m_rightSplitter->addWidget(tabs);
 
   ImageDetailList *imageList = new ImageDetailList(&filter);
+  m_imageList = imageList;
   m_rightSplitter->addWidget(imageList);
-  connect(imageList, &ImageDetailList::imageActivated, imageView,
+  connect(imageList, &ImageDetailList::imageActivated, m_imageView,
           &ImageView::setImage);
-  connect(imageView, &ImageView::goForward, imageList,
+  connect(m_imageView, &ImageView::goForward, imageList,
           &ImageDetailList::forward);
-  connect(imageView, &ImageView::goBackward, imageList,
+  connect(m_imageView, &ImageView::goBackward, imageList,
           &ImageDetailList::backward);
+  connect(m_backAction, &QAction::triggered, imageList,
+          &ImageDetailList::backward);
+  connect(m_forwardAction, &QAction::triggered, imageList,
+          &ImageDetailList::forward);
+  connect(imageList->selectionModel(), &QItemSelectionModel::currentChanged,
+          this, &MainWindow::updateNavButtons);
+  connect(imageList->model(), &QAbstractItemModel::modelReset, this,
+          &MainWindow::updateNavButtons);
+  updateNavButtons();
 
   horizontalSplitter->addWidget(m_rightSplitter);
   horizontalSplitter->setStretchFactor(1, 1);
   horizontalSplitter->setCollapsible(1, false);
+}
+
+void MainWindow::updateNavButtons() {
+  const QModelIndex current = m_imageList->currentIndex();
+  if (!current.isValid()) {
+    m_backAction->setEnabled(false);
+    m_forwardAction->setEnabled(false);
+    return;
+  }
+  m_backAction->setEnabled(current.row() > 0);
+  m_forwardAction->setEnabled(current.row() < m_imageList->model()->rowCount() - 1);
 }
 
 void MainWindow::setupEventFilters(QObject *obj) {
