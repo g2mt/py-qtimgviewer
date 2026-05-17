@@ -10,6 +10,7 @@
 #include <imgviewer/DirectoryList.h>
 #include <imgviewer/ImageDetailList.h>
 #include <imgviewer/ImageView.h>
+#include <imgviewer/TagListContainer.h>
 #include <imgviewer/MainWindow.h>
 #include <imgviewer/TagList.h>
 
@@ -157,7 +158,7 @@ void MainWindow::setupRightSplitter(QSplitter *horizontalSplitter,
   QTabWidget *tabs = new QTabWidget();
   DirectoryList *dirList = new DirectoryList(&filter);
   tabs->addTab(dirList, "Directory");
-  TagList *tagList = new TagList(&filter);
+  TagListContainer *tagList = new TagListContainer(&filter);
   tabs->addTab(tagList, "Tags");
   m_rightSplitter->addWidget(tabs);
 

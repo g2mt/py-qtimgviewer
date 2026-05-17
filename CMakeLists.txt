@@ -17,6 +17,7 @@ add_executable(imgviewer
     src/ImageView.cpp 
     src/DirectoryList.cpp 
     src/TagList.cpp 
+    src/TagListContainer.cpp 
     src/ImageDetailList.cpp
     src/ImageDetailModel.cpp
     src/utils.cpp
@@ -28,6 +29,7 @@ add_executable(imgviewer
     src/include/imgviewer/ImageDetailList.h
     src/include/imgviewer/ImageDetailModel.h
     src/include/imgviewer/TagList.h
+    src/include/imgviewer/TagListContainer.h
 )
 target_compile_definitions(imgviewer PRIVATE -DQT_DEPRECATED_WARNINGS)
 target_include_directories(imgviewer PRIVATE src/include)
